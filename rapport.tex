@@ -1,0 +1,154 @@
+% Author: Till Tantau
+% Source: The PGF/TikZ manual
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+\usepackage{amsmath}    % need for subequations
+\usepackage{graphicx}   % need for figures
+\usepackage{verbatim}   % useful for program listings
+\usepackage{color}      % use if color is used in text
+%\usepackage{subfigure}  % use for side-by-side figures
+\usepackage{hyperref}   % use for hypertext links, including those to external documents and URLs
+\usepackage{url}
+\usepackage{float}
+\usepackage{todonotes}
+\usepackage{tikz}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{pdfpages}
+\usepackage{caption}
+\usepackage{epsfig}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{amsfonts}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc} % use for allowing < and > in cleartext
+\usepackage{fixltx2e}    % use for textsubscript
+\usepackage[linesnumbered,boxed,ruled]{algorithm2e}
+\usepackage{mathtools}
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+%\newcommand{\BigO}[1]{\ensuremath{\operatorname{O}\left(#1\right)}}
+\newcommand{\BigO}[1]{\ensuremath{\mathop{}\mathopen{}\mathcal{O}\mathopen{}\left(#1\right)}}
+
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+\lstset{ %
+  backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
+  basicstyle=\footnotesize,        % the size of the fonts that are used for the code
+  breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
+  breaklines=true,                 % sets automatic line breaking
+  captionpos=b,                    % sets the caption-position to bottom
+  commentstyle=\color{mygreen},    % comment style
+  deletekeywords={...},            % if you want to delete keywords from the given language
+  escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
+  extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+  %frame=single,                    % adds a frame around the code
+  keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+  keywordstyle=\color{blue},       % keyword style
+  language=Octave,                 % the language of the code
+  morekeywords={*,...},            % if you want to add more keywords to the set
+  numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
+  numbersep=5pt,                   % how far the line-numbers are from the code
+  numberstyle=\tiny\color{mygray}, % the style that is used for the line-numbers
+  rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+  showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+  showstringspaces=false,          % underline spaces within strings only
+  showtabs=false,                  % show tabs within strings adding particular underscores
+  stepnumber=2,                    % the step between two line-numbers. If it's 1, each line will be numbered
+  stringstyle=\color{mymauve},     % string literal style
+  tabsize=2,                       % sets default tabsize to 2 spaces
+  %title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+}
+
+\bibliographystyle{plain}
+\begin{document}
+\graphicspath{ {./images/} }
+\date{May 21st 2014}
+\title{Mining build orders in StarCraft 2: Heart of the Swarm}
+
+\author{Andrea Catalini\\
+\texttt{acat@itu.dk}
+\and Michał Królikowski\\
+\texttt{mikrl@itu.dk}
+\and Rick Marker\\
+\texttt{rdam@itu.dk}}
+
+\clearpage\maketitle
+\thispagestyle{empty}
+\setcounter{page}{1}
+\begin{abstract}
+
+\end{abstract}
+
+%\newpage
+%\setcounter{page}{1}
+
+\section{Introduction}
+In this paper we will be looking at the real time strategy game StarCraft 2 by Blizzard Entertainment. 
+In StarCraft 2 you play as 1 of 3 races: Protoss, Terran and Zerg. It is possible to play alone against another player, or in teams. As your skill increases you win more matches and when you win matches you will move to higher leagues, in match equally skilled players together. The game is monthly played by XXX gamers and is one of the most popular eSports, making it an interesting domain to study.
+Specifically we will be researching whether it is possible to answer the following questions based on the order in which a player creates building and uses abilities (hereafter called actions):
+\begin{enumerate}
+%\item Is it possible to predict what race this player played against? \label{q:opponent}
+\item Is it possible to predict who will win?\label{q:win}
+\item When clustering the action order, will it line up with the league indices?\label{q:league}
+\end{enumerate}
+
+We will explore \ref{q:win} by using the ID3 algorithm. This will give us the immediate answer to the questions, but equally interesting is it that we can see what the biggest differentiator on winning and losing is. In \ref{q:league} we will use k-means \todo{Can be changed} to check if action order are related to league index. The reason behind is we want to figure out whether action order alone is enough to make a good player, assuming good players will be in better leagues.
+
+\subsection{Data set}
+The data used is obtained by crawling \url{Gamereplays.org} for data files.
+These files were in a format called 'sc2replay', used by StarCraft 2, to show replays. Due to difference in formats, we are only focusing on files from the expansion pack Heart of the Swarm. This gave us just 462 replay files. The data which can be found in these files include: Winner, player races, player legaue, build order of each player, abilities order by each player, units killed.
+For each of the attributes which were a list a timestamp was given to be able to relate each event to each other.\\
+
+We note that when we want to answer our questions based on building we only mean the sequence in which they were build, not using the exact information about when they were build.
+
+\section{Preprocessing}
+In order to use both ID3 and k-means we had to preprocess the files. We started by reformatting the data, so the data was not centered around a game, but rather a player.
+In effect this meant breaking ties between player and opponents, but as the only information we needed about the opponent was the race, we added this information to the new player-tuple.
+
+Afterwards we filtered our data, removing all tuples with less than 110 actions made, ensuring we still had enough data points to work with, but also that the games were long enough to contain valuable information. We note that this filtering introduces some bias, as strategies such as 'Zerg Rush'\footnote{A strategy where a Zerg player builds small ground units to take the opponent unaware}, will be filtered away as it contains considerably fewer actions than 110.
+
+We then cleaned our data from some noise, in form of modded games. These were found by looking at the buildings used and if a player made an action which is not possible as that race, the tuple would be removed. We note that this may not remove all modded games, as multiple mods exist, and not all of them involve build order. Furthermore it is possible that Zerg plays has been filtered out as one of the units have an ability to take over a opposing race. The ability is rarely used, so we assumed this a precice way of filtering.
+
+When all the filtering was done we had 757 plays to analyze evenly distributed between the 3 races.\\
+
+Having 110 dimensions, which each can take about 55 different actions (depends on race), we decided to reduce the dimensions.
+
+First we reduced the about 55 different actions into 7 by categorizing them. The categories ended up being: 'Structure for building fighters', 'Structure to improve economy', 'Defensive structures', 'Workers', 'Ground units', 'Advanced fighters', 'Upgrades'.
+
+We then reduced the dimension of the 110 actions to 22, by grouping them into sets of 5, where only category which the player has spent the most resources on would be selected. To be able to compare the different types of resources we have added a weight to each type, specified by a domain specialist.
+
+\section{Predicting who will win}
+
+\section{Clustering the data}
+
+\section{Discussion}
+We think our experiments prove that there is no correlation between build order, and whether you win or which league you are in. Though we realize that many improvements could be done in order to make our conclusion more sound.
+
+First of all, a bigger data set should be used. This is very feasible as new replay files are uploaded every day. Secondly there is a part of the preprocessing where we choose the category of actions which is the most expensive. As our domain specialist noted, the weights are not static, but changes from map to map, and even during the course of a single game. Having a set value for each resource will not produce the optimal result.
+
+Should one extend upon the work, we would advise to take into account another factor. That could be resource management, or possibly the actual build times, and not just the sequence information.
+
+\section{Conclusion}
+
+
+\newpage
+
+\begin{thebibliography}{}
+
+\bibitem{paper:example}
+Bibitem Example
+
+
+\end{thebibliography}
+
+%code in appendix
+\section*{Appendix}
+\appendix
+
+%\lstinputlisting[language=Python]{../src/dsbf.py}
+
+
+\end{document}

@@ -99,37 +99,47 @@ We will explore \ref{q:win} by using the ID3 algorithm. This will give us the im
 
 \subsection{Data set}
 The data used is obtained by crawling \url{Gamereplays.org} for data files.
-These files were in a format called 'sc2replay', used by StarCraft 2, to show replays. Due to difference in formats, we are only focusing on files from the expansion pack Heart of the Swarm. This gave us just 462 replay files. The data which can be found in these files include: Winner, player races, player legaue, build order of each player, abilities order by each player, units killed.
-For each of the attributes which were a list a timestamp was given to be able to relate each event to each other.\\
+These files were in a format called 'sc2replay', used by StarCraft 2, to show replays. Due to difference in formats, we are only focusing on files from the expansion pack Heart of the Swarm. This gave us just 462 replay files. The data which can be found in these files include: Winner, the players races, the players legaues, build order of each player, abilities order by each player, units killed by each player.
+For each of the attributes, which were a list, a timestamp was given to be able to relate each event to each other.\\
 
-We note that when we want to answer our questions based on building we only mean the sequence in which they were build, not using the exact information about when they were build.
+We note that when we want to answer our questions based on the order of actions we only mean the sequence in which they were used, not using the exact information about when they were build.
 
 \section{Preprocessing}
 In order to use both ID3 and k-means we had to preprocess the files. We started by reformatting the data, so the data was not centered around a game, but rather a player.
 In effect this meant breaking ties between player and opponents, but as the only information we needed about the opponent was the race, we added this information to the new player-tuple.
 
-Afterwards we filtered our data, removing all tuples with less than 110 actions made, ensuring we still had enough data points to work with, but also that the games were long enough to contain valuable information. We note that this filtering introduces some bias, as strategies such as 'Zerg Rush'\footnote{A strategy where a Zerg player builds small ground units to take the opponent unaware}, will be filtered away as it contains considerably fewer actions than 110.
+We then cleaned our data from some noise, in form of modded games. These were found by looking at the buildings used and if a player made an action which is not possible as that race, the tuple would be removed. We note that this may not remove all modded games, as multiple mods exist, and not all of them involve buildings, but could involve how many resources. Furthermore it is possible that some Zerg plays has been filtered out as one of the units have an ability to take over a opposing race. The ability is rarely used, so we assumed this a precice way of filtering.
 
-We then cleaned our data from some noise, in form of modded games. These were found by looking at the buildings used and if a player made an action which is not possible as that race, the tuple would be removed. We note that this may not remove all modded games, as multiple mods exist, and not all of them involve build order. Furthermore it is possible that Zerg plays has been filtered out as one of the units have an ability to take over a opposing race. The ability is rarely used, so we assumed this a precice way of filtering.
+Afterwards the goal was to limit our dimensions. As each race is able to do about 70 different actions (depending on race), and on average 280 actions are performed (in our data set), our space would be too sparse with those dimensions. So first we decided to group the actions into categories, instead of looking at each action individually. We came up with 7 categories: 'Structure for building fighters', 'Structure to improve economy', 'Defensive structures', 'Workers', 'Ground units', 'Advanced fighters', 'Upgrades'.
 
-When all the filtering was done we had 757 plays to analyze evenly distributed between the 3 races.\\
+Then we wanted to reduce the list of actions taken. We had two approaches regarding this: Group actions into bins, or group resource usage into bins. The idea being that one category would be the representative for that bin.
 
-Having 110 dimensions, which each can take about 55 different actions (depends on race), we decided to reduce the dimensions.
+\subsection{Action-based binning}
+At first we tried to group actions into bins using only the first 110 actions, filtering out plays with fewer than 110 action. 110 was a judgement call, keeping in mind that we wanted as many actions as possible, while avoiding filtering away too many tuples.
+We noted that the filtering introduces some bias, as strategies such as 'Zerg Rush'\footnote{A strategy where a Zerg player builds small ground units to take the opponent unaware}, will be filtered away as it contains considerably fewer actions than 110.
+The way the representative was chosen, was by looking at which action was done the most. The main reason we thought this approach unfit, was that it weighted each actions equally high no matter the actual cost of that action. 
 
-First we reduced the about 55 different actions into 7 by categorizing them. The categories ended up being: 'Structure for building fighters', 'Structure to improve economy', 'Defensive structures', 'Workers', 'Ground units', 'Advanced fighters', 'Upgrades'.
+\subsection{Resource-based binning}
+To remedy the problems with action based binning, we tried binning according to resources. The idea being that each bin would represent a fraction of the total resources used.
+By doing it this way around, we would not need to filter according to number of actions, introducing no bias in this way.
+As multiple kinds of resources exist in StarCraft 2, we decided to add weight to each kind of resources, so a straight forward comparison could be made. We asked a domain specialist about his best approximation of weights.
+As we only asked one domain specialist, and no clear concensus has been established these weights introduces some bias into the experiment.
+Furthermore we made the bins of different sizes keeping the bins in the early game smaller, as the actions taking in that part of the game are cheaper. This was to prevent that the high resource usage towards the end would result in too many actions towards the start being binned together. The sizes of the bins have been chosen by looking at the data and approximating fair splits for the bins.
 
-We then reduced the dimension of the 110 actions to 22, by grouping them into sets of 5, where only category which the player has spent the most resources on would be selected. To be able to compare the different types of resources we have added a weight to each type, specified by a domain specialist.
+In the following, the approach which binned by resources will be used, as it seemed less biased and did not filter away data points.
+A comparison was made between the two approaches was made, and it seemed there was little difference between them.
 
 \section{Predicting who will win}
 
 \section{Clustering the data}
 
 \section{Discussion}
-We think our experiments prove that there is no correlation between build order, and whether you win or which league you are in. Though we realize that many improvements could be done in order to make our conclusion more sound.
+We think our experiments prove that there is no correlation between build order, whether you win or which league you are in. Though we realize that many improvements could be done in order to make our conclusion more sound.
 
-First of all, a bigger data set should be used. This is very feasible as new replay files are uploaded every day. Secondly there is a part of the preprocessing where we choose the category of actions which is the most expensive. As our domain specialist noted, the weights are not static, but changes from map to map, and even during the course of a single game. Having a set value for each resource will not produce the optimal result.
+First of all, a bigger data set should be used. This is very feasible as new replay files are uploaded every day.
+Secondly there is a part of the preprocessing where weights for the resources are chosen. As our domain specialist noted, the weights in game are not static, but changes from map to map, and even during the course of a single game. Having a set value for each resource will not produce the optimal result.
 
-Should one extend upon the work, we would advise to take into account another factor. That could be resource management, or possibly the actual build times, and not just the sequence information.
+Should one extend upon the work, we would advise to take into account another factor. That could be resource management, or possibly the actual build times, and not just the sequence information, where actual build times seems more like the natural extension.
 
 \section{Conclusion}
 

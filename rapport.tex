@@ -30,7 +30,9 @@
 \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
 %\newcommand{\BigO}[1]{\ensuremath{\operatorname{O}\left(#1\right)}}
 \newcommand{\BigO}[1]{\ensuremath{\mathop{}\mathopen{}\mathcal{O}\mathopen{}\left(#1\right)}}
-
+%\addtolength{\oddsidemargin}{-.5in}
+%\addtolength{\evensidemargin}{-.5in}
+%\addtolength{\textwidth}{1.2in}
 \definecolor{mygreen}{rgb}{0,0.6,0}
 \definecolor{mygray}{rgb}{0.5,0.5,0.5}
 \definecolor{mymauve}{rgb}{0.58,0,0.82}
@@ -79,83 +81,140 @@
 \thispagestyle{empty}
 \setcounter{page}{1}
 \begin{abstract}
-This report will look at analyzing data from the real time strategy game StarCraft 2.
-The data will come from replay files uploaded to internet, and the questions we will try to answer is the following: Using the sequence in which actions were taken, is it possible to see if the player won or lost. Furthermore we will also if there is a relation between a players skill level (indicated by which league he represents) and the order in which he performs actions.
-We will answer the first question by using the ID3 algorithm, and the second question by clustering the data using the k-means algorithm and evaluate whether each cluster represents a league.
-Our results indicate that the order in which actions are used can not be used to predict a winner, nor does it serve to predict a players league.
+This report concerns StarCraft 2 real time strategy game data analysis.
+The data has been obtained by parsing game replay files uploaded to the Internet by the players. An attempt is made to answer following questions:
+\begin{itemize}
+\item Using the sequence in which actions were performed, can one predict if the player won or lost?
+\item Is there a clear relation between players’ skill level (indicated by his league ranking) and the order in which he performs actions?
+\end{itemize}
+For the first answer, ID3 tree algorithm is used. For the second one, k-means clustering algorithm is applied, and  an evaluation is performed, to see clusters produced represent leagues.
+The results of the experiment  indicate, that only the order in which actions are taken can not be used to predict a winner with high accuracy, nor does it serve to predict a players league.
 \end{abstract}
 
 %\newpage
 %\setcounter{page}{1}
 
 \section{Introduction}
-In this paper we will be looking at the real time strategy game StarCraft 2 by Blizzard Entertainment. 
-In StarCraft 2 you play as 1 of 3 races: Protoss, Terran and Zerg. It is possible to play alone against another player, or in teams. As your skill increases you win more matches and when you win matches you will move to higher leagues, in match equally skilled players together. The game is monthly played by XXX gamers and is one of the most popular eSports, making it an interesting domain to study.
-Specifically we will be researching whether it is possible to answer the following questions based on the order in which a player creates building and uses abilities (hereafter called actions):
+In this paper we will look at the real time strategy game “StarCraft 2” by Blizzard Entertainment. 
+In StarCraft 2, the player commands an army of one of 3 races: Protoss, Terran or Zerg. The game features “1 vs 1” mode, in which two players compete against each other, and a teamplay mode, with more armies involved.
+The game features league hierarchy. As the player’s skills increase, they win more matches and thereby advance to better leagues, to be matched against equally skilled players. Having reached 3.000.000 registered players, the game holds a steady position among the worlds most popular e-sports - along with League of Legends, Warcraft III and FIFA Online. That makes it an interesting domain to study.
+Specifically, we will focus on the action order of StarCraft 2 games. The action order is the chronological order in which a player builds units and uses abilities throughout a game. Based on this data, we will answer the following questions:
 \begin{enumerate}
 %\item Is it possible to predict what race this player played against? \label{q:opponent}
-\item Is it possible to predict who will win?\label{q:win}
-\item When clustering the action order, will it line up with the league indices?\label{q:league}
+\item Is it possible to predict if the player will win?\label{q:win}
+\item Does clustering the action order of various players, clearly separate the leagues?\label{q:league}
 \end{enumerate}
 
-We will explore question \ref{q:win} by using the ID3 algorithm. This will give us the immediate answer to the questions, but equally interesting is it that we can see what the biggest differentiator on winning and losing is. For question \ref{q:league} we will use k-means \todo{Can be changed} to check if action order are related to league index. The reason behind is we want to figure out whether action order alone is enough to make a good player, assuming good players will be in better leagues.
+To answer those questions, we have used WEKA - an open source data mining environment, implementing various mining algorithms, along with preprocessing and visualisation methods. We have also generated graphs depicting the distribution of action order paths taken by the players.
+We have explored question [\ref{q:win}] using the C4.5 tree algorithm. Apart from the answer to the stated question, we were also interested in seeing the first branchings of the generated trees, as the features that they represent are the best predictors about who could win. 
+For the question [\ref{q:league}] we have used the k-means algorithm to check if the action order was related to the league index. It was interesting to see if the action order alone was characteristic enough to distinguish good players from bad ones, assuming good players were in better leagues.
 
 \subsection{Data set}
-The data used is obtained by crawling \url{Gamereplays.org} for data files.
-These files were in a format called 'sc2replay', used by StarCraft 2, to show replays. Due to difference in formats, we are only focusing on files from the expansion pack Heart of the Swarm. This gave us just 462 replay files. The data which can be found in these files include: Winner, the players races, the players legaues, build order of each player, abilities order by each player, units killed by each player.
-For each of the attributes, which were a list, a timestamp was given to be able to relate each event to each other.\\
+The data used has been obtained by crawling a popular archive \url{Gamereplays.org} for data files.
+The files obtained were natively in a 'sc2replay' format, used by StarCraft 2 engine to record and replay games. Due to differences in the structure of the replays generated by the existence of different patches of the game, we used only the files from the Heart of the Swarm expansion pack. This gave us 462 replay files. The replay files included various data about the games, but we were only interested in the following features: the outcome of the game, the player races, the player leagues, each player’s build- and ability order.
+We note, that even though action timestamps were available in the files, the purpose of this report was to answer our questions based only on the order of actions - without using the exact timestamp information.
 
-We note that when we want to answer our questions based on the order of actions we only mean the sequence in which they were used, not using the exact information about when they were build.
 
 \section{Preprocessing}
-In order to use both ID3 and k-means we had to preprocess the files. We started by reformatting the data, so the data was not centered around a game, but rather a player.
-In effect this meant breaking ties between player and opponents, but as the only information we needed about the opponent was the race, we added this information to the new player-tuple.
+\label{sec:preprocessing}
+In order to use data mining algorithms implemented in WEKA, we had to preprocess the files. We started by reformatting the data, defining a single player’s build order as a tuple.
+In effect this meant breaking ties between the players and their opponents, but as the only information we needed about the opponents were the races, we added this information to the new player-tuples.
+The data was cleaned from noise generated by modded pre-defined games. Those were the games in which the regular StarCraft 2 rules were bent. Games like those were filtered by removing the tuples where players performed actions that were considered invalid according to the regular games - e.g. building units that are not of the players race. We note that this may not have removed all the modded games, as multiple Starcraft 2 mods exist, and not all of them involve buildings - some may e.g. change the resources economy. Furthermore, it is possible that some matches that involved Zerg race may have been incorrectly filtered, as one of the units of the Zerg army has an ability to take control of an opposing unit - such overtaken unit’s actions would eventually be registered as illegal events, and would be filtered out. The ability is rarely used though, so we assumed this a fair tradeoff.
+Afterwards, we limited the dimension of the data. As each race is able to do ~70 different actions (depending on race), and 280 actions are performed on average per game, the initial space was too sparse with those dimensions. Hence the team decided to group the actions into categories, instead of considering each action individually. Eventually 7 categories were created: \textit{Structure for building fighters}, \textit{Structure to improve economy}, \textit{Defensive structure}, \textit{Worker}, \textit{Ground unit}, \textit{Advanced fighter unit}, \textit{Upgrade}.
 
-We then cleaned our data from some noise, in form of modded games. These were found by looking at the buildings used and if a player made an action which is not possible as that race, the tuple would be removed. We note that this may not remove all modded games, as multiple mods exist, and not all of them involve buildings, but could involve how many resources players have. Furthermore it is possible that some Zerg plays has been filtered out as one of the units have an ability to take over a opposing race. The ability is rarely used, so we assumed this a precice way of filtering.
+The next necessary step was reducing the list of taken actions. Different approaches were tested for doing this reduction. In the initial approaches, we grouped the actions into bins of five, then we extracted the most frequent among them as the value of the bin. Unfortunately those results were unsatisfactory, so the team decided to group the actions according to the resource usage. 
 
-Afterwards the goal was to limit our dimensions. As each race is able to do about 70 different actions (depending on race), and on average 280 actions are performed (in our data set), our space would be too sparse with those dimensions. So first we decided to group the actions into categories, instead of looking at each action individually. We came up with 7 categories: 'Structure for building fighters', 'Structure to improve economy', 'Defensive structures', 'Workers', 'Ground units', 'Advanced fighters', 'Upgrades'.
+Each bin of the actions represented a fraction of the total resources obtained and spent by the player throughout the game.
+As multiple kinds of resources exist in StarCraft 2, we decided to assign weight to each of them, so that a straightforward comparison could be made. Moreover the team asked a domain specialist about his best approximation of weights.
+As only one person was consulted and no clear consensus was established, these weights introduce some bias into the experiment.
+Furthermore a dynamic growth of the bins was introduced, as the early actions in the game are usually cheaper, but not less significant. Otherwise, the players that vastly develop their economy, would have too large bin sizes at the beginning of the game to make any sense. The sizes of the bins were chosen by empirical approximation of fair splits for the bins.
 
-Then we wanted to reduce the list of actions taken. We had two approaches regarding this: Group actions into bins, or group resource usage into bins. The idea being that one category would be the representative for that bin.
+\section{Predicting A Winner}
+For predicting the winner we have chosen a decision tree algorithm. This would not only answer our question, but also provide insight into the most relevant features for the winner prediction. More specifically, we have chosen WEKA’s J48 implementation of the C4.5 algorithm. It served our case better than ID3, because of its strength in processing attributes with large number of values.
+The ID3 algorithm and the C4.5 algorithm share some traits: They are both supervised learning algorithms, meaning they need a training set with predictors and the resulting class to be able to work. Furthermore they are both eager in the way they process data from training sets, meaning they spend more time during training, but are faster at predicting. They both also rely on Information Gain in order to decide on which attributes to split, Information Gain being a measure of the reduction in Information Entropy the split would generate. One difference between ID3 and C4.5 is that ID3 uses the Information Gain as it is, and C4.5 uses a normalized version. C4.5 also has other properties negligible in our case, i.e. C4.5 is able to handle numeric values and missing values.
+Both algorithms work recursively by first looking at all the whole data set, and finding the feature which provides the most Information Gain. Once found, the root branches out: one branch for each value of the feature. At the next level, the chosen feature is disregarded, and the same approach is used for the remaining data. The algorithm stops if:
 
-\subsection{Action-based binning}
-At first we tried to group actions into bins using only the first 110 actions, filtering out plays with fewer than 110 action. 110 was a judgement call, keeping in mind that we wanted as many actions as possible, while avoiding filtering away too many tuples.
-We noted that the filtering introduces some bias, as strategies such as 'Zerg Rush'\footnote{A strategy where a Zerg player builds small ground units to take the opponent unaware}, will be filtered away as it contains considerably fewer actions than 110.
-The way the representative was chosen, was by looking at which action was done the most. The main reason we thought this approach unfit, was that it weighted each actions equally high no matter the actual cost of that action. 
+\begin{itemize}
+\item all the elements in the subset belongs to the same class, in which case that node becomes a leaf
+\item there are no remaining attributes for further partitioning
+\item the subset have no examples left
+\end{itemize}
 
-\subsection{Resource-based binning}
-To remedy the problems with action based binning, we tried binning according to resources. The idea being that each bin would represent a fraction of the total resources used.
-By doing it this way around, we would not need to filter according to number of actions, introducing no bias in this way.
-As multiple kinds of resources exist in StarCraft 2, we decided to add weight to each kind of resources, so a straight forward comparison could be made. We asked a domain specialist about his best approximation of weights.
-As we only asked one domain specialist, and no clear concensus has been established these weights introduces some bias into the experiment.
-Furthermore we made the bins of different sizes keeping the bins in the early game smaller, as the actions taking in that part of the game are cheaper. This was to prevent that the high resource usage towards the end would result in too many actions towards the start being binned together. The sizes of the bins have been chosen by looking at the data and approximating fair splits for the bins.
+WIn the first approaches, we have been using the data binned by actions. Then, we were able to answer correctly in 53\% cases. For a comparison, ZeroR, answers correctly 50.1\% of the time. This was the key motivator for changing to resource based binning, as explained in section \ref{sec:preprocessing}. Furthermore we have also decided to split the data according to player army’s race, instead of analysing all the games at once. After the split, the success rate rose to 52\%, but by tuning the confidence factor, the minimum number of objects per leaf and the degree of pruning, we managed to get just below 60\% correct classifications. It did however require individual settings for each race, which suggests, that no clear relation exist, and it depends too much on the parameters. Figure \ref{fig:win:zerg} shows the resulting tree for Zerg. To our surprise, it is very shallow, suggesting that only very few bins determine whether or not the player will win. The tree in the figure has been pruned, but it did perform marginally better than its unpruned counterpart (56\% versus 54\%) showing that you do not gain any more accuracy by including more features. The trees for Protoss and Terran, which can be found in the Appendix, look very similar to Figure \ref{fig:win:zerg}. 
+\begin{figure}[H]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.95\linewidth]{tree_zerg_pruned}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.95\linewidth]{tree_zerg_unpruned}
+\end{subfigure}
+\caption{The pruned and unpruned decision tree of Zerg. Pruned version has correctly 56\% of time times and the unpruned 54\%}
+\label{fig:win:zerg}
+\end{figure}
 
-In the following, the approach which binned by resources will be used, as it seemed less biased and did not filter away data points.
-A comparison was made between the two approaches was made, and it seemed there was little difference between them.
-
-\section{Predicting who will win}
+In an additional test, the 3 race datasets were further divided according to the race of the opponent. This seemed logical, however, the results have shown to be very similar to the to the previous ones, after typical tailoring has been applied. Because of that, we consider that the actions that the players took weren’t very related to the races of their opponents. Hence the team decided to keep the penultimate results for greater readability and because splitting the dataset so much left us with very small subsets, which was considered high factor of weakness.
+Our conclusion is that although we got up to 60\% correct classifications, only a very weak connection between the action order and game outcome exist. Furthermore we note that splitting the data set based on race, made our data sets much smaller. For our results to be considered robust the experiment should be repeated with a larger data set.
 
 \section{Clustering the data}
+TThe team wanted to try to see if it was possible to discover the league the player belongs to, based on his action order. In order to achieve our goal we have used the cluster analysis. This kind of analysis tries to find similarities between data according to its characteristics. It groups the data with high affinity together, trying to keep the concept of high intra-class similarity and low inter-class similarity.
+
+The algorithm that we chose for this task was k-means, in WEKA implemented as SimpleKmeans. K-means is an unsupervised learning method, which means that the training set that it obtains has no class labels - they are unknown. This method is usually used for finding hidden structures in data.
+
+The algorithm uses an initial k attribute that corresponds to the numbers of clusters to be generated. Its first step is division of the dataset in k nonempty subsets. K-means has also another input - the seed, which used for obtaining the centroids -  the “middle” values of each cluster. Ast the initial subsets are created and their centres are defined, the algorithm iterates over the tuples, reassigning each object to the cluster with the nearest centroid. The distance between a value and a centroid is based on the previously mentioned distance metric. This process iterates, until the clusters stabilize - which means no more reassignments occur during a whole iteration.
+
+As all our features were nominal, we have used the Hamming distance - If two values are the same the distance is 0, if they are not the same the distance is 1.
+Just like in the previous section, the tests were initially conducted on the data of all the races merged together binned by actions, and with tuples limited to 110 actions. We have later divided the data and binned it by the resource usage.
+For every format of the dataset, the same logic about the number of clusters was applied. Initially, the k was defined as the amount of leagues that we had in our data - 8. This seemed the most logical choice to start with, however the result was not satisfactory, as players of different leagues were spread among all the clusters as shown in Figure \ref{fig:cluster-8}.
+\begin{figure}[H]
+\centering
+  \includegraphics[width=.95\linewidth]{cluster-8}
+\caption{Chart of the actions taken by Zerg players. Thinkness represents frequency. y-axis is action, x-axis is timeline. Color represents outcome. Green means mostly wins, red mostly loses, and yellow represents that wins and loses are evenly present}
+\label{fig:cluster-8}
+\end{figure}
+
+Then, since some of the leagues were much less less represented, the team decided to set k to the number of the biggest leagues - 5. Unfortunately the results showed to be affected by the same problem.
+The last test was conducted with an even smaller number, k = 3 and again the results were not different. The figures for the additional experiments can be found in the Appendix.
+
+In all the tests the seed value was iterated upon 4 or 5 times with very far and random values. We wanted to see if different initial points for the k centroids could make a difference, but unfortunately it did not have any positive impact on the result.
+
+With those results, we have arrived at the conclusion that players cannot be classified into leagues, by simply checking their action order. More data is needed to be able to categorize them that way.
+
+\section{Additional validation - data visualisation}
+As an additional tool for our results validation, we created a tool for charting the distribution of player’s actions throughout their games, opposed to various factors - game outcome, player’s league, or armie’s races.
+The obtained charts confirmed our results. Very few factors stood out from the overall distribution in the graphs that depicts the outcome of the game, as seen in figure \ref{fig:sequence_win_zerg}, and no factors held any significance on the charts representing the league rankings, as seen in figure \ref{fig:sequence_league}. 
+\begin{figure}[H]
+\centering
+  \includegraphics[width=.95\linewidth]{sequence_win_zerg}
+\caption{Chart of the actions taken by Zerg players. Thinkness represents frequency. y-axis is action, x-axis is timeline. Color represents outcome. Green means mostly wins, red mostly loses, and yellow represents that wins and loses are evenly present}
+\label{fig:sequence_win_zerg}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+  \includegraphics[width=.95\linewidth]{sequence_league}
+\caption{Chart of the actions taken by Zerg players. Thinkness represents frequency. y-axis is action, x-axis is timeline. Colors is average league, green being league 1, and red league 8. }
+\label{fig:sequence_league}
+\end{figure}
 
 \section{Discussion}
-We think our experiments prove that there is no correlation between build order, whether you win or which league you are in. Though we realize that many improvements could be done in order to make our conclusion more sound.
-
+Our experiments prove that there is no strong correlation between the action order, the outcome of the match and the league they are in. Though, we realize that many improvements could be done in order to make our conclusion more sound.
 First of all, a bigger data set should be used. This is very feasible as new replay files are uploaded every day.
-Secondly there is a part of the preprocessing where weights for the resources are chosen. As our domain specialist noted, the weights in game are not static, but changes from map to map, and even during the course of a single game. Having a set value for each resource will not produce the optimal result.
+Secondly one of the preprocessing actions required assigning weights to resource types. As our domain specialist noted, the weights in the game are not static, but they change according to the maps, and even during a single match. Having a static, pre-set value for each resource type did not produce the optimal result.
+It is worth noting, that the team, despite having some experience with the game, could have explored the domain knowledge more vastly, and could have used more domain specialists for consultation and brainstorming. One of the spheres where the domain knowledge might have helped more, was the unit classification The team had a difficulty assigning less stereotypical unit types into defined classes, and agreeing on the class definitions, as every race had some characteristic traits the others lacked. For example, Protoss army includes many advanced unit types, some of which are not precisely fighters, but rather back-line support units. As the other armies lacked such units, we have decided not to introduce such division and to assign the support units into the same class as the heavy fighters.
+In the last point of the discussion, we would like to point out, that even if the results of our game outcome prediction are not significant, we succeeded in nearly 60\% cases. Therefore, some knowledge might be obtained by analysing the trees we have generated. For example: The Protoss players are less likely to win if they are still spending their resources on upgrades in the 80\% of the game, and the Zerg players are more likely to succeed if they vastly produce small fighters between 40th\% and 60\% of the game time.
+Should one extend upon the work, we would advise to take another, additional factor into account. That could be resource management, or possibly the actual build times, and not just the sequence information.
 
-Should one extend upon the work, we would advise to take into account another factor. That could be resource management, or possibly the actual build times, and not just the sequence information, where actual build times seems more like the natural extension.
 
 \section{Conclusion}
-
+Although the data set used is too small to be able to obtain the desired level of robustness in our conclusion, our study has uncovered the following:
+Using C4.5 algorithm, is not possible to clearly tell who is going to win a game of StarCraft 2 based on the order of player’s actions. The best result achieved by our team was 59\% success rate for one of the races, which is not, in our eyes, significant. The decision trees with such success rate can be found in the appendix, as despite low success rate they still hold knowledge.
+Furthermore we have shown, by using clustering, that the order in which players perform actions does not relate to the league of the player in any clear way.
+It is our opinion that further study in the area would benefit by extending the problem to include the actual timestamps at which buildings were produced, and by using a larger data set. Exploration of the domain knowledge more, and using the guidance of professional players and domain experts would be also advised for future work.\footnote{Thanks to Mike Debus, for providing domain knowledge}
 
 \newpage
-
-\begin{thebibliography}{}
-
-\bibitem{paper:example}
-Bibitem Example
-
-
-\end{thebibliography}
 
 %code in appendix
 \section*{Appendix}
